@@ -1,9 +1,12 @@
+use std::cell::RefCell;
 use log::{info, warn};
 use shipyard::{UniqueView, UniqueViewMut, World};
 use std::future::Future;
+use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Instant;
 use cgmath::num_traits::signum;
+use smaa::{SmaaMode, SmaaTarget};
 //use wasm_bindgen::JsCast;
 
 use wgpu::{Adapter, Device, Instance, Queue, Surface, SurfaceConfiguration, SurfaceError, SurfaceTexture, TextureFormat};
@@ -219,7 +222,14 @@ fn create_graphics(event_loop: &ActiveEventLoop) -> impl Future<Output = Graphic
             wsize.width as i32,
             wsize.height as i32,
         );
-
+        let mut smaa_target = Rc::new( RefCell::new(SmaaTarget::new(
+            &device,
+            &queue,
+            surface_config.width,
+            surface_config.height,
+            surface_config.format,
+            SmaaMode::Smaa1X,
+        )));
         Graphics {
             device: device,
             adapter: adapter,
@@ -227,11 +237,12 @@ fn create_graphics(event_loop: &ActiveEventLoop) -> impl Future<Output = Graphic
             window: rc_window,
             surface: surface,
             surface_config: surface_config,
-            //window_size: window_size,
+            smaa_target: smaa_target,
             background_pipe_line: background_pipe_line,
             camera: Camera::default(),
             mesh_pipe_line: mesh_pipe_line,
             txt_pipe_line: txt_pipe_line,
+
         }
     }
 }

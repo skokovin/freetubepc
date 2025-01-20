@@ -17,19 +17,25 @@ use cgmath::{Deg, Point3, Rad};
 use log::warn;
 //use once_cell::sync::Lazy;
 use crate::utils::materials::{Material, MATERIALS_COUNT};
+use egui::Id;
 use is_odd::IsOdd;
-use shipyard::{EntitiesViewMut, EntityId, Unique, UniqueViewMut, ViewMut, World};
+use shipyard::{
+    AllStoragesViewMut, EntitiesViewMut, EntityId, System, Unique, UniqueViewMut, ViewMut, World,
+};
 use smaa::{SmaaFrame, SmaaMode, SmaaTarget};
 use std::collections::HashMap;
 use std::f64::consts::PI;
 use std::fmt::{Debug, Formatter};
 use std::fs::File;
 use std::io::{BufWriter, Write};
+use std::num::NonZeroU64;
 use std::ops::{Mul, Range};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 use std::{iter, mem};
+use std::cell::RefCell;
+use std::rc::Rc;
 use truck_base::bounding_box::BoundingBox;
 use truck_base::cgmath64::Vector3;
 use truck_modeling::Curve;
@@ -37,6 +43,9 @@ use truck_stepio::out;
 use truck_stepio::out::StepModel;
 use truck_topology::Solid;
 
+use crate::ui::renderer::ScreenDescriptor;
+use crate::ui::ui_renderer::EguiRenderer;
+use crate::ui::uis::{left_panel, top_panel, wind1};
 use wgpu::util::DeviceExt;
 use wgpu::{
     Adapter, BindGroup, BindingResource, Buffer, BufferAddress, BufferAsyncError, BufferSlice,
@@ -48,8 +57,6 @@ use winit::event::{ElementState, KeyEvent, WindowEvent};
 use winit::event_loop::ActiveEventLoop;
 use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::window::Window;
-use crate::ui::renderer::ScreenDescriptor;
-use crate::ui::ui_renderer::EguiRenderer;
 
 const METADATA_COUNT: usize = 256;
 const STRIGHT_COLOR: u32 = 76;
@@ -178,7 +185,6 @@ pub struct GlobalState {
     pub instant: Instant,
     pub dt: f64,
     pub is_next_frame_ready: bool,
-    pub smaa_target: SmaaTarget,
     pub is_reversed: bool,
 }
 impl GlobalState {
@@ -222,6 +228,19 @@ impl GlobalState {
 }
 unsafe impl Send for GlobalState {}
 unsafe impl Sync for GlobalState {}
+#[derive(Unique)]
+pub struct UIOverlay {
+    pub egui_renderer: EguiRenderer,
+}
+impl UIOverlay {
+    pub fn new(egui_renderer: EguiRenderer) -> Self {
+        Self {
+            egui_renderer: egui_renderer,
+        }
+    }
+}
+unsafe impl Send for UIOverlay {}
+unsafe impl Sync for UIOverlay {}
 
 #[derive(Unique)]
 pub struct GlobalScene {
@@ -246,10 +265,15 @@ pub struct GlobalScene {
     pub light_buffer: Buffer,
     pub metadata: Vec<[i32; 4]>,
     pub metadata_buffer: Buffer,
-    pub egui_renderer: EguiRenderer,
 }
 impl GlobalScene {
-    pub fn new(device: &Device, queue: &Queue, v_up_orign: &cgmath::Vector3<f64>, w: u32, h: u32, egui_renderer: EguiRenderer ) -> Self {
+    pub fn new(
+        device: &Device,
+        queue: &Queue,
+        v_up_orign: &cgmath::Vector3<f64>,
+        w: u32,
+        h: u32,
+    ) -> Self {
         let camera_buffer: Buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("Camera Uniform Buffer"),
             size: 144,
@@ -332,7 +356,6 @@ impl GlobalScene {
             light_buffer: light_buffer,
             metadata: metadata_default,
             metadata_buffer: metadata_buffer,
-            egui_renderer:egui_renderer,
         }
     }
     pub fn resize(&mut self, device: &Device, w: u32, h: u32) {
@@ -399,24 +422,19 @@ pub struct Graphics {
     pub window: Arc<Window>,
     pub surface: Surface<'static>,
     pub surface_config: SurfaceConfiguration,
+    pub smaa_target: Rc<RefCell<SmaaTarget>> ,
     pub background_pipe_line: BackGroundPipeLine,
     pub camera: Camera,
     pub mesh_pipe_line: MeshPipeLine,
     pub txt_pipe_line: TxtPipeLine,
 
 }
+
 unsafe impl Send for Graphics {}
 unsafe impl Sync for Graphics {}
 
 pub fn init_graphics(world: &World, gr: Graphics) {
-    let smaa_target: SmaaTarget = SmaaTarget::new(
-        &gr.device,
-        &gr.queue,
-        gr.surface_config.width,
-        gr.surface_config.height,
-        gr.surface_config.format,
-        SmaaMode::Smaa1X,
-    );
+
 
     let gs = GlobalState {
         is_right_mouse_pressed: false,
@@ -431,11 +449,17 @@ pub fn init_graphics(world: &World, gr: Graphics) {
         dt: 0.0,
         is_next_frame_ready: false,
 
-        smaa_target: smaa_target,
         is_reversed: false,
     };
-    let egui_renderer: EguiRenderer = EguiRenderer::new(&gr.device, gr.surface_config.format, None, 1, &*gr.window.clone());
+    let egui_renderer: EguiRenderer = EguiRenderer::new(
+        &gr.device,
+        gr.surface_config.format,
+        None,
+        1,
+        &*gr.window.clone(),
+    );
 
+    let ui_overlay = UIOverlay::new(egui_renderer);
 
     let g_scene = GlobalScene::new(
         &gr.device,
@@ -443,12 +467,12 @@ pub fn init_graphics(world: &World, gr: Graphics) {
         &gs.v_up_orign,
         gr.surface_config.width,
         gr.surface_config.height,
-        egui_renderer,
     );
 
     world.add_unique(gr);
     world.add_unique(gs);
     world.add_unique(g_scene);
+    world.add_unique(ui_overlay);
 }
 pub fn set_right_mouse_pressed(mut gs: UniqueViewMut<GlobalState>) {
     gs.is_right_mouse_pressed = true;
@@ -461,8 +485,15 @@ pub fn mouse_move(pos: PhysicalPosition<f64>, mut gs: UniqueViewMut<GlobalScene>
     gs.mouse_x = pos.x;
     gs.mouse_y = pos.y;
 }
-pub fn uievent(event: &WindowEvent,mut graphics: UniqueViewMut<Graphics>, mut g_scene: UniqueViewMut<GlobalScene>){
-    g_scene.egui_renderer.handle_input(graphics.window.as_ref(), event);
+pub fn uievent(
+    event: &WindowEvent,
+    mut graphics: UniqueViewMut<Graphics>,
+    mut g_scene: UniqueViewMut<GlobalScene>,
+    mut ui_overlay: UniqueViewMut<UIOverlay>,
+) {
+    ui_overlay
+        .egui_renderer
+        .handle_input(graphics.window.as_ref(), event);
 }
 pub fn resize_window(
     new_size: PhysicalSize<u32>,
@@ -474,11 +505,17 @@ pub fn resize_window(
         graphics.camera.resize(new_size.width, new_size.height);
         graphics.surface_config.width = new_size.width;
         graphics.surface_config.height = new_size.height;
-        graphics.surface.configure(&graphics.device, &graphics.surface_config);
-        gs.smaa_target.resize(&graphics.device, new_size.width, new_size.height);
+        graphics
+            .surface
+            .configure(&graphics.device, &graphics.surface_config);
+
+        graphics.smaa_target.borrow_mut().resize(&graphics.device, new_size.width, new_size.height);
+
         let arr: [i32; 4] = [new_size.width as i32, new_size.height as i32, 0, 0];
-        graphics.background_pipe_line.add_data_buffer = graphics.device.create_buffer_init(
-            &wgpu::util::BufferInitDescriptor {
+        graphics.background_pipe_line.add_data_buffer =
+            graphics
+                .device
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
                     label: Some(format!("AddData Uniform Buffer").as_str()),
                     contents: bytemuck::cast_slice(&arr),
                     usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
@@ -697,10 +734,9 @@ pub fn key_frame(
 
                 let (cyls, tors) = {
                     if (!gs.is_reversed) {
-
                         cnc_to_poly(&gs.lraclr_arr, &gs.v_up_orign)
                     } else {
-                       cnc_to_poly(&gs.lraclr_arr_reversed, &gs.v_up_orign)
+                        cnc_to_poly(&gs.lraclr_arr_reversed, &gs.v_up_orign)
                     }
                 };
                 let (v, i) = all_to_one(&cyls, &tors);
@@ -779,6 +815,7 @@ pub fn render(
     mut graphics: UniqueViewMut<Graphics>,
     mut g_scene: UniqueViewMut<GlobalScene>,
     mut gs: UniqueViewMut<GlobalState>,
+    mut ui_overlay: UniqueViewMut<UIOverlay>,
 ) {
     match graphics.surface.get_current_texture() {
         Ok(out) => {
@@ -846,9 +883,9 @@ pub fn render(
             let depth_view: TextureView =
                 depth_texture.create_view(&wgpu::TextureViewDescriptor::default());
 
-            let smaa_frame: SmaaFrame =
-                gs.smaa_target
-                    .start_frame(&graphics.device, &graphics.queue, &view);
+
+            let mut target =graphics.smaa_target.borrow_mut();
+            let smaa_frame: SmaaFrame = target.start_frame(&graphics.device, &graphics.queue, &view);
 
             let mut encoder: CommandEncoder =
                 graphics
@@ -1402,37 +1439,22 @@ pub fn render(
             //UI
             {
                 let screen_descriptor = ScreenDescriptor {
-                    size_in_pixels: [graphics.surface_config.width, graphics.surface_config.height],
+                    size_in_pixels: [
+                        graphics.surface_config.width,
+                        graphics.surface_config.height,
+                    ],
                     pixels_per_point: graphics.window.scale_factor() as f32,
                 };
 
-                g_scene.egui_renderer.begin_frame(&*graphics.window.clone());
-                egui::Window::new("winit + egui + wgpu says hello!")
-                    .resizable(true)
-                    .vscroll(true)
-                    .default_open(false)
-                    .show(g_scene.egui_renderer.context(), |ui| {
-                        ui.label("Label!");
+                ui_overlay
+                    .egui_renderer
+                    .begin_frame(&*graphics.window.clone());
+                top_panel(&ui_overlay, &mut *g_scene, &mut *gs);
+                left_panel(&ui_overlay);
 
-                        if ui.button("Button!").clicked() {
-                            println!("boom!")
-                        }
+                //wind1(&g_scene);
 
-                        ui.separator();
-                        ui.horizontal(|ui| {
-                            ui.label(format!(
-                                "Pixels per point: {}",
-                                g_scene.egui_renderer.context().pixels_per_point()
-                            ));
-                            if ui.button("-").clicked() {
-                                //g_scene.scale_factor = (g_scene.scale_factor - 0.1).max(0.3);
-                            }
-                            if ui.button("+").clicked() {
-                                //g_scene.scale_factor = (g_scene.scale_factor + 0.1).min(3.0);
-                            }
-                        });
-                    });
-                g_scene.egui_renderer.end_frame_and_draw(
+                ui_overlay.egui_renderer.end_frame_and_draw(
                     &graphics.device,
                     &graphics.queue,
                     &mut encoder,
@@ -1447,7 +1469,9 @@ pub fn render(
             out.present();
             graphics.window.request_redraw();
 
-            if (IS_OFFSCREEN_BUFFER_MAPPED.load(Ordering::Relaxed) && g_scene.is_offscreen_requested) {
+            if (IS_OFFSCREEN_BUFFER_MAPPED.load(Ordering::Relaxed)
+                && g_scene.is_offscreen_requested)
+            {
                 g_scene.is_offscreen_requested = false;
                 IS_OFFSCREEN_BUFFER_MAPPED.store(false, Ordering::Relaxed);
                 let mut result: Vec<[i32; 4]> = vec![];
@@ -1483,7 +1507,10 @@ pub fn render(
     }
 }
 
-pub fn render_selection(mut graphics: UniqueViewMut<Graphics>, mut g_scene: UniqueViewMut<GlobalScene>, ) {
+pub fn render_selection(
+    mut graphics: UniqueViewMut<Graphics>,
+    mut g_scene: UniqueViewMut<GlobalScene>,
+) {
     if (!g_scene.is_offscreen_requested) {
         let sel_texture_desc = wgpu::TextureDescriptor {
             size: wgpu::Extent3d {
@@ -1654,7 +1681,6 @@ pub fn render_selection(mut graphics: UniqueViewMut<Graphics>, mut g_scene: Uniq
     }
 }
 
-
 pub fn on_keyboard(
     event: KeyEvent,
     mut graphics: UniqueViewMut<Graphics>,
@@ -1670,15 +1696,14 @@ pub fn on_keyboard(
             match event.state {
                 ElementState::Pressed => {}
                 ElementState::Released => {
-                                    let stp: Vec<u8> = Vec::from((include_bytes!("../files/2.stp")).as_slice());
-                        g_scene.bend_step = 1;
-                        let (lraclr_arr) = analyze_stp(&stp);
-                        //let lraclr_arr_i32 = LRACLR::to_array(&lraclr_arr);
-                        gs.state = ReadyToLoad((lraclr_arr, true));
-                        gs.v_up_orign = P_UP_REVERSE;
-                        //let obj_file = ops.all_to_one_obj_bin();
-                        //warn!("FILE ANALYZED C {:?}",prerender.steps_data.len());
-
+                    let stp: Vec<u8> = Vec::from((include_bytes!("../files/2.stp")).as_slice());
+                    g_scene.bend_step = 1;
+                    let (lraclr_arr) = analyze_stp(&stp);
+                    //let lraclr_arr_i32 = LRACLR::to_array(&lraclr_arr);
+                    gs.state = ReadyToLoad((lraclr_arr, true));
+                    gs.v_up_orign = P_UP_REVERSE;
+                    //let obj_file = ops.all_to_one_obj_bin();
+                    //warn!("FILE ANALYZED C {:?}",prerender.steps_data.len());
                 }
             }
         }
@@ -1686,17 +1711,16 @@ pub fn on_keyboard(
             match event.state {
                 ElementState::Pressed => {}
                 ElementState::Released => {
-                        g_scene.bend_step = 1;
-                        let stp: Vec<u8> = Vec::from((include_bytes!("../files/2.stp")).as_slice());
-                        let lraclr_arr = analyze_stp(&stp);
-                        let lraclr_arr_reversed: Vec<LRACLR> = cnc::reverse_lraclr(&lraclr_arr);
-                        gs.state = ReadyToLoad((lraclr_arr, true));
-                        gs.v_up_orign = P_UP_REVERSE;
+                    g_scene.bend_step = 1;
+                    let stp: Vec<u8> = Vec::from((include_bytes!("../files/2.stp")).as_slice());
+                    let lraclr_arr = analyze_stp(&stp);
+                    let lraclr_arr_reversed: Vec<LRACLR> = cnc::reverse_lraclr(&lraclr_arr);
+                    gs.state = ReadyToLoad((lraclr_arr, true));
+                    gs.v_up_orign = P_UP_REVERSE;
 
-                        //gs.state = ReadyToLoad((prerender,lraclr_arr_reversed));
-                        //let obj_file = ops.all_to_one_obj_bin();
-                        //warn!("FILE ANALYZED C {:?}",prerender.steps_data.len());
-
+                    //gs.state = ReadyToLoad((prerender,lraclr_arr_reversed));
+                    //let obj_file = ops.all_to_one_obj_bin();
+                    //warn!("FILE ANALYZED C {:?}",prerender.steps_data.len());
                 }
             }
         }
