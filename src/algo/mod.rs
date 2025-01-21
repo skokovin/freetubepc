@@ -29,6 +29,7 @@ use truck_geometry::prelude::{BSplineCurve, Plane};
 use truck_meshalgo::prelude::*;
 use truck_stepio::r#in::{Axis2Placement3dHolder, Axis2PlacementHolder, BSplineCurveWithKnots, CartesianPoint, CartesianPointHolder, CurveAnyHolder, DirectionHolder, FaceBoundHolder, NonRationalBSplineCurveHolder, NonRationalBSplineSurfaceHolder, Table, VectorHolder, VertexPointHolder};
 use nom::Finish;
+use utf8_read::Reader;
 
 pub const PI36_FLOAT_RANGE: [f64; 36] = {
     let mut v: [f64; 36] = [0.0; 36];
@@ -2243,6 +2244,40 @@ pub fn extract_plane_points(table: &Table, scale: f64) -> Vec<Point3> {
     });
     points
 }
+
+pub fn analyze_stp_path(f:File) -> Vec<LRACLR> {
+    let mut reader = Reader::new(&f);
+    let mut stp = String::new();
+    reader.into_iter().for_each(|c|{
+        match c {
+            Ok(subs) => {stp.push(subs)},
+            Err(e) => {
+                warn!("FE {:?}", e);
+                stp.push_str("F");
+            }
+        }
+    });
+
+    let scale = extact_scale(&stp);
+
+    let fixed_stp: String =stp.replace(",(),", ",'',");
+
+    let exchange = ruststep::parser::parse(&fixed_stp).unwrap();
+    let table: Table = Table::from_data_section(&exchange.data[0]);
+
+    let (cyls, tors) = extract_cyls(&table, scale);
+
+    let cyls_no_dubs = MainCylinder::remove_dublicates(&cyls);
+    let cyls_merged = MainCylinder::merge(&cyls_no_dubs);
+    let bend_toros_no_dublicates: Vec<BendToro> = BendToro::remove_dublicates(&tors);
+    let merged_tors = BendToro::merge(&bend_toros_no_dublicates);
+    let racalculated_tors: Vec<BendToro> = recalc_tors_tole(&cyls_merged, &merged_tors);
+    let lracmd: Vec<LRACLR> = find_bending_surface(&cyls_merged, &racalculated_tors,&table,scale);
+
+    lracmd
+
+}
+
 pub fn analyze_stp(_stp: &Vec<u8>) -> Vec<LRACLR> {
     let mut transcoded = DecodeReaderBytesBuilder::new().encoding(Some(WINDOWS_1251)).build(_stp.as_slice());
     let mut buf: Vec<u8> = vec![];

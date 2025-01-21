@@ -173,7 +173,7 @@ impl ApplicationHandler<Graphics> for App {
 
 
 fn create_graphics(event_loop: &ActiveEventLoop) -> impl Future<Output = Graphics> + 'static {
-    let wsize: PhysicalSize<u32> = winit::dpi::PhysicalSize::new(800, 600);
+    let wsize: PhysicalSize<u32> = winit::dpi::PhysicalSize::new(1024, 768);
     let window_attrs = Window::default_attributes().with_inner_size(wsize.clone());
     let rc_window: Arc<Window> = Arc::new(event_loop.create_window(window_attrs).unwrap());
     async move {

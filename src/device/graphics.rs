@@ -57,6 +57,7 @@ use winit::event::{ElementState, KeyEvent, WindowEvent};
 use winit::event_loop::ActiveEventLoop;
 use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::window::Window;
+use crate::ui::keypad::Keypad;
 
 const METADATA_COUNT: usize = 256;
 const STRIGHT_COLOR: u32 = 76;
@@ -231,12 +232,17 @@ unsafe impl Sync for GlobalState {}
 #[derive(Unique)]
 pub struct UIOverlay {
     pub egui_renderer: EguiRenderer,
+    pub keypad: Keypad,
 }
 impl UIOverlay {
     pub fn new(egui_renderer: EguiRenderer) -> Self {
         Self {
             egui_renderer: egui_renderer,
+            keypad: Keypad::new(),
         }
+    }
+    pub  fn raw_input_hook(&mut self, ctx: &egui::Context, raw_input: &mut egui::RawInput) {
+        self.keypad.bump_events(ctx, raw_input);
     }
 }
 unsafe impl Send for UIOverlay {}
@@ -266,6 +272,7 @@ pub struct GlobalScene {
     pub metadata: Vec<[i32; 4]>,
     pub metadata_buffer: Buffer,
     pub selected_id: i32,
+    pub is_dorn_left_side: bool,
 }
 impl GlobalScene {
     pub fn new(
@@ -353,6 +360,7 @@ impl GlobalScene {
             metadata: metadata_default,
             metadata_buffer: metadata_buffer,
             selected_id:-1,
+            is_dorn_left_side: false,
         }
     }
     pub fn resize(&mut self, device: &Device, w: u32, h: u32) {
@@ -711,8 +719,10 @@ pub fn key_frame(
             ChangeDornDir => {
                 if (signum(gs.v_up_orign.z) < 0.0) {
                     gs.v_up_orign = P_UP;
+                    g_scene.is_dorn_left_side = true;
                 } else {
                     gs.v_up_orign = P_UP_REVERSE;
+                    g_scene.is_dorn_left_side = false;
                 }
 
                 let (cyls, tors) = {
