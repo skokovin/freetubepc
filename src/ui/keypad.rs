@@ -1,4 +1,5 @@
 use eframe::egui::{self, pos2, vec2, Button, Ui, Vec2};
+use egui::TextBuffer;
 use log::warn;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -18,6 +19,7 @@ struct State {
     focus: Option<egui::Id>,
     events: Option<Vec<egui::Event>>,
     digits:String,
+    sign:String,
 }
 
 impl State {
@@ -29,7 +31,8 @@ impl State {
             start_pos: pos2(100.0, 100.0),
             focus: None,
             events: None,
-            digits:String::new(),
+            digits:String::from("|"),
+            sign:String::from("+"),
         }
     }
 
@@ -98,36 +101,62 @@ impl Keypad {
             let _size_2x1 = vec2(64.0 + window_margin.left, 26.0);
 
             ui.spacing_mut().item_spacing = Vec2::splat(window_margin.left);
-            ui.label(state.digits.as_str());
+            ui.horizontal(|ui| {
+                if ui.add_sized(size_1x1, Button::new("OK")).clicked() {
+                }
+                ui.label(state.sign.as_str());
+                ui.label(state.digits.as_str());
+            });
+
             ui.horizontal(|ui| {
                 if ui.add_sized(size_1x1, Button::new("1")).clicked() {
-                    state.digits.push('1');
+                    state.digits=state.digits.replace("|","1|");
                     state.queue_char('1');
                 }
                 if ui.add_sized(size_1x1, Button::new("2")).clicked() {
+                    state.digits=state.digits.replace("|","2|");
                     state.queue_char('2');
                 }
                 if ui.add_sized(size_1x1, Button::new("3")).clicked() {
+                    state.digits=state.digits.replace("|","3|");
                     state.queue_char('3');
                 }
                 if ui.add_sized(size_1x1, Button::new("⏮")).clicked() {
+                    let mut orig_str=String::from("|");
+                    let  str_tmp=state.digits.replace("|","");
+                    orig_str.push_str(str_tmp.as_str());
+                    state.digits=orig_str;
                     state.queue_key(egui::Key::Home);
                 }
                 if ui.add_sized(size_1x1, Button::new("🔙")).clicked() {
+                    match state.digits.find("|") {
+                        None => {}
+                        Some(index) => {
+                            if index>0 {
+                                state.digits.remove(index-1);
+                            }
+                        }
+                    }
                     state.queue_key(egui::Key::Backspace);
                 }
             });
             ui.horizontal(|ui| {
                 if ui.add_sized(size_1x1, Button::new("4")).clicked() {
+                    state.digits=state.digits.replace("|","4|");
                     state.queue_char('4');
                 }
                 if ui.add_sized(size_1x1, Button::new("5")).clicked() {
+                    state.digits=state.digits.replace("|","5|");
                     state.queue_char('5');
                 }
                 if ui.add_sized(size_1x1, Button::new("6")).clicked() {
+                    state.digits=state.digits.replace("|","6|");
                     state.queue_char('6');
                 }
                 if ui.add_sized(size_1x1, Button::new("⏭")).clicked() {
+                    let mut str_tmp=state.digits.replace("|","");
+                    str_tmp.push_str("|");
+                    state.digits=str_tmp;
                     state.queue_key(egui::Key::End);
                 }
                 if ui.add_sized(size_1x1, Button::new("⎆")).clicked() {
@@ -137,35 +166,69 @@ impl Keypad {
             });
             ui.horizontal(|ui| {
                 if ui.add_sized(size_1x1, Button::new("7")).clicked() {
+                    state.digits=state.digits.replace("|","7|");
                     state.queue_char('7');
                 }
                 if ui.add_sized(size_1x1, Button::new("8")).clicked() {
+                    state.digits=state.digits.replace("|","8|");
                     state.queue_char('8');
                 }
                 if ui.add_sized(size_1x1, Button::new("9")).clicked() {
+                    state.digits=state.digits.replace("|","9|");
                     state.queue_char('9');
                 }
                 if ui.add_sized(size_1x1, Button::new("⏶")).clicked() {
                     state.queue_key(egui::Key::ArrowUp);
                 }
-                if ui.add_sized(size_1x1, Button::new("⌨")).clicked() {
-                    trans = Transition::CloseImmediately;
+                if ui.add_sized(size_1x1, Button::new("+/-")).clicked() {
+                    if(state.sign=="+") {
+                        state.sign=state.sign.replace("+","-");
+                    } else {
+                        state.sign=state.sign.replace("-","+");
+                    }
+
+                    //trans = Transition::CloseImmediately;
                 }
             });
             ui.horizontal(|ui| {
                 if ui.add_sized(size_1x1, Button::new("0")).clicked() {
+                    state.digits=state.digits.replace("|","0|");
                     state.queue_char('0');
                 }
                 if ui.add_sized(size_1x1, Button::new(".")).clicked() {
+                    state.digits=state.digits.replace(".","");
+                    state.digits=state.digits.replace("|",".|");
                     state.queue_char('.');
                 }
                 if ui.add_sized(size_1x1, Button::new("⏴")).clicked() {
+                   match state.digits.find("|") {
+                       None => {}
+                       Some(index) => {
+                            let mut str_tmp=state.digits.replace("|","");
+                            if index>0 {
+                                 str_tmp.insert(index-1,'|');
+                                 state.digits=str_tmp;
+                            }
+                       }
+                   }
+
                     state.queue_key(egui::Key::ArrowLeft);
                 }
                 if ui.add_sized(size_1x1, Button::new("⏷")).clicked() {
                     state.queue_key(egui::Key::ArrowDown);
                 }
                 if ui.add_sized(size_1x1, Button::new("⏵")).clicked() {
+                    match state.digits.find("|") {
+                        None => {}
+                        Some(index) => {
+                            let mut str_tmp=state.digits.replace("|","");
+                            let l=str_tmp.len();
+                            if index>=0 && index<l {
+                                str_tmp.insert(index+1,'|');
+                                state.digits=str_tmp;
+                            }
+                        }
+                    }
                     state.queue_key(egui::Key::ArrowRight);
                 }
             });
