@@ -109,7 +109,6 @@ impl InCmd {
                                             id1: id1.round() as i32,
                                             id2: id2.round() as i32,
                                             l: abs(l as f64),
-                                            lt: Rad::from(Deg(a as f64)).0*clr as f64,
                                             r: r as f64,
                                             a: abs(a as f64),
                                             clr: abs(clr as f64),

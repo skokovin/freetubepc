@@ -2,6 +2,7 @@ pub mod ui_renderer;
 pub mod renderer;
 pub mod uis;
 pub mod keypad;
+pub mod app_settings;
 
 pub fn toggle_ui(ui: &mut egui::Ui, on: &mut bool) -> egui::Response {
     // Widget code can be broken up in four steps:

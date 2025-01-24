@@ -57,6 +57,7 @@ use winit::event::{ElementState, KeyEvent, WindowEvent};
 use winit::event_loop::ActiveEventLoop;
 use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::window::Window;
+use crate::ui::app_settings::AppSettings;
 use crate::ui::keypad::Keypad;
 
 const METADATA_COUNT: usize = 256;
@@ -137,41 +138,6 @@ impl Debug for AnimState {
         )
     }
 }
-pub struct BendParameters {
-    pub stright_speed: f64,
-    pub rotate_speed: f64,
-    pub angle_speed: f64,
-}
-impl BendParameters {
-    pub fn default() -> Self {
-        Self {
-            stright_speed: 100.0,
-            rotate_speed: 10.0,
-            angle_speed: 10.0,
-        }
-    }
-    pub fn set_params_from_f32vec(&mut self, vec: &Vec<f32>) {
-        match vec.get(0) {
-            None => {}
-            Some(v) => self.stright_speed = v.clone() as f64,
-        }
-        match vec.get(1) {
-            None => {}
-            Some(v) => self.rotate_speed = v.clone() as f64,
-        }
-        match vec.get(2) {
-            None => {}
-            Some(v) => self.angle_speed = v.clone() as f64,
-        }
-    }
-    pub fn params_to_f32vec(&self) -> Vec<f32> {
-        Vec::from([
-            self.stright_speed as f32,
-            self.rotate_speed as f32,
-            self.angle_speed as f32,
-        ])
-    }
-}
 
 #[derive(Unique)]
 pub struct GlobalState {
@@ -199,7 +165,7 @@ impl GlobalState {
         let mut pipe_radius: f64 = 0.0;
         self.lraclr_arr.iter().for_each(|lracl| {
             tot_x = tot_x + lracl.l;
-            tot_x = tot_x + lracl.lt;
+            tot_x = tot_x + lracl.lt();
             pipe_radius = lracl.pipe_radius;
         });
         let half = tot_x / 2.0;
@@ -212,7 +178,7 @@ impl GlobalState {
         let mut tot_x: f64 = 0.0;
         self.lraclr_arr.iter().for_each(|lracl| {
             tot_x = tot_x + lracl.l;
-            tot_x = tot_x + lracl.lt;
+            tot_x = tot_x + lracl.lt();
         });
         tot_x
     }
@@ -233,17 +199,19 @@ unsafe impl Sync for GlobalState {}
 pub struct UIOverlay {
     pub egui_renderer: EguiRenderer,
     pub keypad: Keypad,
+    pub settings_modal:AppSettings,
 }
 impl UIOverlay {
     pub fn new(egui_renderer: EguiRenderer) -> Self {
         Self {
             egui_renderer: egui_renderer,
             keypad: Keypad::new(),
+            settings_modal:AppSettings::new(),
         }
     }
-    pub  fn raw_input_hook(&mut self, ctx: &egui::Context, raw_input: &mut egui::RawInput) {
+/*    pub  fn raw_input_hook(&mut self, ctx: &egui::Context, raw_input: &mut egui::RawInput) {
         self.keypad.bump_events(ctx, raw_input);
-    }
+    }*/
 }
 unsafe impl Send for UIOverlay {}
 unsafe impl Sync for UIOverlay {}
@@ -255,7 +223,6 @@ pub struct GlobalScene {
     pub dim_x: DimX,
     pub dim_z: DimZ,
     pub dim_b: DimB,
-    pub bend_params: BendParameters,
     pub mesh_size: usize,
     pub v_buffer_mesh: Buffer,
     pub i_buffer_mesh: Buffer,
@@ -343,7 +310,6 @@ impl GlobalScene {
             dim_x: DimX::new(&device),
             dim_z: DimZ::new(&device),
             dim_b: DimB::new(&device),
-            bend_params: BendParameters::default(),
             mesh_size: 0,
             v_buffer_mesh: i_buffer,
             i_buffer_mesh: v_buffer,
@@ -606,7 +572,7 @@ pub fn key_frame(
                             &gs.anim_state,
                             &gs.v_up_orign,
                             gs.dt,
-                            &g_scene.bend_params,
+
                         )
                     } else {
                         cnc::cnc_to_poly_animate(
@@ -614,7 +580,7 @@ pub fn key_frame(
                             &gs.anim_state,
                             &gs.v_up_orign,
                             gs.dt,
-                            &g_scene.bend_params,
+
                         )
                     }
                 };
@@ -770,7 +736,6 @@ pub fn key_frame(
                             id1: id1.round() as i32,
                             id2: id2.round() as i32,
                             l: abs(l as f64),
-                            lt: Rad::from(Deg(a as f64)).0 * clr as f64,
                             r: r as f64,
                             a: abs(a as f64),
                             clr: abs(clr as f64),
@@ -788,7 +753,6 @@ pub fn key_frame(
                 }
             }
             States::NewBendParams(params) => {
-                g_scene.bend_params.set_params_from_f32vec(&params);
                 gs.revert_state()
             }
             States::SelectFromWeb(id) => {
@@ -1391,8 +1355,8 @@ pub fn render(
                 };
 
                 ui_overlay.egui_renderer.begin_frame(&*graphics.window.clone());
-                top_panel(&ui_overlay, &mut *g_scene, &mut *gs);
-                left_panel(&ui_overlay, &mut *g_scene, &mut *gs);
+                top_panel(&mut ui_overlay, &mut *g_scene, &mut *gs);
+                left_panel(&mut ui_overlay, &mut *g_scene, &mut *gs);
 
                 //wind1(&g_scene);
 

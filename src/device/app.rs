@@ -140,13 +140,17 @@ impl ApplicationHandler<Graphics> for App {
                     },
                     MouseButton::Other(_) => {}
                 },
-                WindowEvent::PinchGesture { .. } => {}
-                WindowEvent::PanGesture { .. } => {}
-                WindowEvent::DoubleTapGesture { .. } => {}
-                WindowEvent::RotationGesture { .. } => {}
-                WindowEvent::TouchpadPressure { .. } => {}
-                WindowEvent::AxisMotion { .. } => {}
-                WindowEvent::Touch(_) => {}
+                WindowEvent::PinchGesture { device_id, delta, phase } => {
+                    warn!("PINCH EVENT {:?} {:?}", delta,phase);
+                }
+                WindowEvent::PanGesture { device_id, delta, phase } => {}
+                WindowEvent::DoubleTapGesture { device_id } => {}
+                WindowEvent::RotationGesture { device_id, delta, phase } => {}
+                WindowEvent::TouchpadPressure { device_id, pressure, stage } => {}
+                WindowEvent::AxisMotion { device_id, axis, value } => {}
+                WindowEvent::Touch(t) => {
+                    warn!("TOUCH EVENT {:?}", t);
+                }
                 WindowEvent::ScaleFactorChanged { .. } => {}
                 WindowEvent::ThemeChanged(_) => {}
                 WindowEvent::Occluded(_) => {}

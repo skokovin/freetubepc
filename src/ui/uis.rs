@@ -1,9 +1,11 @@
 use std::cmp::PartialEq;
 use std::fs::{File, OpenOptions};
 use std::io::{BufRead, BufReader, BufWriter, Read, Write};
+use std::sync::atomic::Ordering;
 use std::time::{SystemTime, UNIX_EPOCH};
 use egui::Sense;
 use egui_extras::Column;
+
 use log::warn;
 use shipyard::UniqueViewMut;
 use crate::algo::{analyze_stp, analyze_stp_path, cnc, P_UP_REVERSE};
@@ -11,6 +13,8 @@ use crate::algo::cnc::LRACLR;
 use crate::device::graphics::{AnimState, GlobalScene, GlobalState, States, UIOverlay};
 use crate::device::graphics::States::{ChangeDornDir, FullAnimate, ReadyToLoad, ReverseLRACLR, SelectFromWeb};
 use crate::ui::{toggle};
+use crate::ui::app_settings::{ANGLE_SPEED, ROTATE_SPEED, STRIGHT_SPEED};
+use crate::ui::keypad::Cmd;
 
 pub fn wind1(ui_overlay: &UIOverlay) {
     egui::Window::new("winit1 + egui + wgpu says hello!").current_pos([100.0, 100.0]).resizable(true).vscroll(true).default_open(false).show(ui_overlay.egui_renderer.context(), |ui| {
@@ -36,8 +40,49 @@ pub fn wind1(ui_overlay: &UIOverlay) {
     });
 }
 
-pub fn top_panel(ui_overlay: &UIOverlay, g_scene: &mut GlobalScene, gs: &mut GlobalState) {
+pub fn top_panel(ui_overlay: &mut UIOverlay, g_scene: &mut GlobalScene, gs: &mut GlobalState) {
     ui_overlay.keypad.show(ui_overlay.egui_renderer.context());
+    ui_overlay.settings_modal.show(ui_overlay.egui_renderer.context(), &mut ui_overlay.keypad);
+
+    match ui_overlay.keypad.check(ui_overlay.egui_renderer.context()) {
+        Cmd::Dismiss => {}
+        Cmd::LRA((lra,indx)) => {
+            let mut new_lra:Vec<LRACLR> = vec![];
+            gs.lraclr_arr.iter().for_each(|lraclr|{
+                if(lraclr.id1==lra.id1 && lraclr.id2==lra.id2){
+                    let mut cmd_tmp=lraclr.clone();
+                    match indx {
+                        0 => {
+                            cmd_tmp.l=lra.l;
+                        }
+                        1 => {
+                            cmd_tmp.r=lra.r;
+                        }
+                        2 => {
+                            cmd_tmp.a=lra.a;
+                        }
+                        3 => {
+                            cmd_tmp.clr=lra.clr;
+                        }
+                        _ => {}
+                    }
+
+
+
+                    new_lra.push(cmd_tmp);
+                }else{
+                    new_lra.push(lraclr.clone());
+                }
+            });
+
+
+
+            gs.change_state(ReadyToLoad((new_lra, false)));
+        }
+        Cmd::StrightSpeedCmd(value) => {STRIGHT_SPEED.store(value,Ordering::Relaxed)}
+        Cmd::RotateSpeedCmd(value) => {ROTATE_SPEED.store(value,Ordering::Relaxed)}
+        Cmd::AngleSpeedCmd(value) => {ANGLE_SPEED.store(value,Ordering::Relaxed)}
+    }
     egui::TopBottomPanel::top("my_panel").show(ui_overlay.egui_renderer.context(), |ui| {
         ui.horizontal_wrapped(|ui| {
             if ui.button("File").clicked() {
@@ -87,11 +132,11 @@ pub fn top_panel(ui_overlay: &UIOverlay, g_scene: &mut GlobalScene, gs: &mut Glo
                         s_out.push_str("0\r\n");
                     }
                     let last = lra.last().unwrap().clone();
-                    s_out.push_str(format!("{}{}", lra.len()-1, ";").as_str());
+                    s_out.push_str(format!("{}{}", lra.len() - 1, ";").as_str());
                     s_out.push_str(format!("{}{}", last.l, ";").as_str());
                     s_out.push_str("\r\n");
                     //let mut d="C:\\tmp\\".to_string();
-                    let mut d="".to_string();
+                    let mut d = "".to_string();
                     d.push_str(SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs_f64().to_string().as_str());
                     d.push_str(".csv");
 
@@ -99,7 +144,6 @@ pub fn top_panel(ui_overlay: &UIOverlay, g_scene: &mut GlobalScene, gs: &mut Glo
                     let mut f = BufWriter::new(f);
                     f.write_all(s_out.as_bytes()).expect("Unable to write data");
                 }
-
             }
             ui.separator();
             ui.menu_button("Demos", |ui| {
@@ -251,22 +295,25 @@ pub fn top_panel(ui_overlay: &UIOverlay, g_scene: &mut GlobalScene, gs: &mut Glo
             });
             ui.separator();
             ui.label("DORN L");
-            if ui.add(toggle( &mut g_scene.is_dorn_left_side)).clicked(){
+            if ui.add(toggle(&mut g_scene.is_dorn_left_side)).clicked() {
                 g_scene.bend_step = 1;
                 gs.state = ChangeDornDir;
                 //warn!("is_dorn_left_side {:?}",g_scene.is_dorn_left_side);
             };
             ui.label("R");
             ui.separator();
-            if ui.button("KP").clicked(){
-                ui_overlay.keypad.set_open_close(ui_overlay.egui_renderer.context());
+            if ui.button("Settings").clicked() {
+                ui_overlay.settings_modal.is_open = true;
             }
         });
     });
+
+
 }
 
-pub fn left_panel(ui_overlay: &UIOverlay, g_scene: &mut GlobalScene, gs: &mut GlobalState) {
+pub fn left_panel(ui_overlay: &mut UIOverlay, g_scene: &mut GlobalScene, gs: &mut GlobalState) {
     //warn!("op_counter {:?}",gs.anim_state.op_counter);
+    //ui_overlay.keypad.show(ui_overlay.egui_renderer.context());
     let col_width = 50.0;
     let col_heigth = 8.0;
     egui::SidePanel::left("side_panel_left").min_width(400.0).show(ui_overlay.egui_renderer.context(), |ui| {
@@ -306,7 +353,7 @@ pub fn left_panel(ui_overlay: &UIOverlay, g_scene: &mut GlobalScene, gs: &mut Gl
             commands.iter().for_each(|lraclr| {
                 ui.horizontal_wrapped(|ui| {
                     if (gs.anim_state.op_counter == count && matches!(gs.state,FullAnimate)) {
-                        ui.add_sized([col_width, col_heigth], egui::Label::new(egui::RichText::new(format!("{:.1}", lraclr.l)).color(egui::Color32::from_rgb(255, 0, 0))));
+                        ui.add_sized([col_width - 10.0, col_heigth], egui::Label::new(egui::RichText::new(format!("{:.1}", lraclr.l)).color(egui::Color32::from_rgb(255, 0, 0))));
                     } else {
                         let color = {
                             if lraclr.id1 == g_scene.selected_id {
@@ -316,10 +363,16 @@ pub fn left_panel(ui_overlay: &UIOverlay, g_scene: &mut GlobalScene, gs: &mut Gl
                             }
                         };
 
-                        if ui.add_sized([col_width, col_heigth],
-                                        egui::Label::new(egui::RichText::new(format!("{:.1}", lraclr.l)).color(color)).sense(Sense::click())).clicked() {
+                        let labl= ui.add_sized([col_width, col_heigth], egui::Label::new(
+                            egui::RichText::new(format!("{:.1}", lraclr.l)).color(color)).selectable(false).sense(Sense::click()));
+
+                        if labl.clicked(){
                             gs.state = SelectFromWeb(lraclr.id1);
-                        };
+                        }
+                        if labl.double_clicked(){
+                            ui_overlay.keypad.set_open_close(ui_overlay.egui_renderer.context(),Cmd::LRA((lraclr.clone(),0)));
+                        }
+
                     }
 
                     ui.separator();
@@ -334,16 +387,25 @@ pub fn left_panel(ui_overlay: &UIOverlay, g_scene: &mut GlobalScene, gs: &mut Gl
                             }
                         };
 
-                        if ui.add_sized([col_width, col_heigth],
-                                        egui::Label::new(egui::RichText::new(format!("{:.1}", lraclr.r)).color(color)).sense(Sense::click())).clicked() {
+
+
+                        let labl= ui.add_sized([col_width, col_heigth], egui::Label::new(
+                            egui::RichText::new(format!("{:.1}", lraclr.r)).color(color)).selectable(false).sense(Sense::click()));
+
+                        if labl.clicked(){
                             gs.state = SelectFromWeb(lraclr.id1);
-                        };
+                        }
+                        if labl.double_clicked(){
+                            ui_overlay.keypad.set_open_close(ui_overlay.egui_renderer.context(),Cmd::LRA((lraclr.clone(),1)));
+                        }
+
+
                     }
                     ui.separator();
                     if (gs.anim_state.op_counter == count + 2 && matches!(gs.state,FullAnimate)) {
                         ui.add_sized([col_width, col_heigth], egui::Label::new(egui::RichText::new(format!("{:.1}", lraclr.a)).color(egui::Color32::from_rgb(255, 0, 0))));
                         ui.separator();
-                        ui.add_sized([col_width, col_heigth], egui::Label::new(egui::RichText::new(format!("{:.1}", lraclr.lt)).color(egui::Color32::from_rgb(255, 0, 0))));
+                        ui.add_sized([col_width, col_heigth], egui::Label::new(egui::RichText::new(format!("{:.1}", lraclr.lt())).color(egui::Color32::from_rgb(255, 0, 0))));
                         ui.separator();
                         ui.add_sized([col_width, col_heigth], egui::Label::new(egui::RichText::new(format!("{:.1}", lraclr.clr)).color(egui::Color32::from_rgb(255, 0, 0))));
                         ui.separator();
@@ -355,21 +417,35 @@ pub fn left_panel(ui_overlay: &UIOverlay, g_scene: &mut GlobalScene, gs: &mut Gl
                                 egui::Color32::from_rgb(255, 255, 255)
                             }
                         };
+                        {
+                            let labl= ui.add_sized([col_width, col_heigth], egui::Label::new(
+                                egui::RichText::new(format!("{:.1}", lraclr.a)).color(color)).selectable(false).sense(Sense::click()));
 
+                            if labl.clicked(){
+                                gs.state = SelectFromWeb(lraclr.id2);
+                            }
+                            if labl.double_clicked(){
+                                ui_overlay.keypad.set_open_close(ui_overlay.egui_renderer.context(),Cmd::LRA((lraclr.clone(),2)));
+                            }
+                        }
+                        ui.separator();
                         if ui.add_sized([col_width, col_heigth],
-                                        egui::Label::new(egui::RichText::new(format!("{:.1}", lraclr.a)).color(color.clone())).sense(Sense::click())).clicked() {
+                                        egui::Label::new(egui::RichText::new(format!("{:.1}", lraclr.lt())).color(color.clone())).sense(Sense::click())).clicked() {
                             gs.state = SelectFromWeb(lraclr.id2);
                         };
                         ui.separator();
-                        if ui.add_sized([col_width, col_heigth],
-                                        egui::Label::new(egui::RichText::new(format!("{:.1}", lraclr.lt)).color(color.clone())).sense(Sense::click())).clicked() {
-                            gs.state = SelectFromWeb(lraclr.id2);
-                        };
-                        ui.separator();
-                        if ui.add_sized([col_width, col_heigth],
-                                        egui::Label::new(egui::RichText::new(format!("{:.1}", lraclr.clr)).color(color.clone())).sense(Sense::click())).clicked() {
-                            gs.state = SelectFromWeb(lraclr.id2);
-                        };
+
+                        {
+                            let labl= ui.add_sized([col_width, col_heigth], egui::Label::new(
+                                egui::RichText::new(format!("{:.1}", lraclr.clr)).color(color)).selectable(false).sense(Sense::click()));
+
+                            if labl.clicked(){
+                                gs.state = SelectFromWeb(lraclr.id2);
+                            }
+                            if labl.double_clicked(){
+                                ui_overlay.keypad.set_open_close(ui_overlay.egui_renderer.context(),Cmd::LRA((lraclr.clone(),3)));
+                            }
+                        }
                         ui.separator();
                     }
                 });
