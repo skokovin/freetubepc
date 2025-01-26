@@ -1,58 +1,16 @@
 # PipeLine Extractor; CNC bend simulator;
 
-Shipyard is a kind of chaos. Web viewer is attempt to direct all from one point. No install, no files, no versions just click the link and see.
+Software for pipe bending machines. Creating a CNC program for the machine requires a pipeline. Typically, a 3D model of a pipe is provided by the customer in the STEP file format. STEP, which adheres to the ISO 10303-21 standard, can contain a wide variety of geometric data structures. The primary challenge is recognizing these data structures to accurately extract pipeline information.
 
-![Untitled video - Made with Clipchamp](https://github.com/skokovin/putout/assets/13080037/514d2e2b-2522-4032-9699-3133bf80d14b)
-
-
-## Intro
-
-When building a ship or something large, there’s typically a 3D model with attributes. Usually, these models can take up a lot of gigabytes. Is there a way to transfer the model over the network and display it in a browser? As far as I know, Chrome can address up to 16GB per tab, also need a way to package a mesh data. This model of a 120 meter vessel takes up about 6GB of memory, packed into 500 MB.
-
-## GUI
-- Web GUI [ShipUI project](https://github.com/skokovin/shipui)
-- Android GUI [GameActivity](https://developer.android.com/games/agdk/game-activity) is not shared yet.
+![Demo GIF](https://github.com/skokovin/freetubepc/blob/3b6a56515852d859082e167e77f0aa98fd9a6474/src/files/bend.gif?raw=true)
 
 ## Basic Tools
 
 Rust - philosophy to do it right. </br>
+Truck - CAGD, STEP. </br>
 WGPU - The brilliant cross-platform, safe, pure-Rust graphics API.</br>
 WINIT - for window handling.</br>
-wasm-pack - to move all to WebAssembly.</br>
-Angular - to stay on static typing ([ShipUI project] (https://github.com/skokovin/shipui))
 
-## Demos
-
-Video instruction [YouTube](https://www.youtube.com/watch?v=E0fKqEAThts). </br>
-[200mb ship](https://viewer004-8db15.web.app/). </br>
-[500mb ship](https://viewer701-f462d.web.app/). </br>
-
-
-## Features
-
-- Hide/Selct
-- 6 sliders
-- Measuring
-- ID for DB requests
-- Transparency
-- Reset center of rotation
-- Orbit/FPS cameras
-- Primitive Snap
-
-
-## Acknowledgements
-
- - [NAUTIC. A lot of perfect ships there ](https://www.nautic.is/)
-
-## Comments
-
-At the first for interactivity I used AABB and ray tracing, but found better technic for this purpose - render to buffer. After each camera transformation special pipeline takes a snapshot, then algorithm analyzed area under mose cursor. Special pipeline use color and alfa chanels for pass back coords and id. </br>
-
-Some logics of hide/select moved to shaders. </br>
-
-## Run Locally
-
-It can start on PC without UI. Press F2 to start loading process.
 
 ## Disclaimer
 
