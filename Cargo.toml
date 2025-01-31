@@ -1,4 +1,5 @@
 #https://drive.google.com/drive/folders/1nIPhVgslOEu4tb16TIFRPvCjSpYIAriw?usp=sharing
+#stdlib-local-copy
 [package]
 name = "freetubpc"
 version = "0.1.0"
