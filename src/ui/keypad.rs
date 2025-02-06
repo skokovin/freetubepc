@@ -125,10 +125,10 @@ impl Keypad {
         ui.vertical(|ui| {
             let window_margin = ui.spacing().window_margin;
             let size_1x1 = vec2(32.0, 26.0);
-            let _size_1x2 = vec2(32.0, 52.0 + window_margin.top);
-            let _size_2x1 = vec2(64.0 + window_margin.left, 26.0);
+            let _size_1x2 = vec2(32.0, 52.0 + window_margin.top as f32);
+            let _size_2x1 = vec2(64.0 + window_margin.left as f32, 26.0);
 
-            ui.spacing_mut().item_spacing = Vec2::splat(window_margin.left);
+            ui.spacing_mut().item_spacing = Vec2::splat(window_margin.left as f32);
 
 
             ui.horizontal(|ui| {

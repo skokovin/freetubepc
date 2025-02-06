@@ -28,7 +28,6 @@ use truck_geometry::nurbs::NurbsCurve;
 use truck_geometry::prelude::{BSplineCurve, Plane};
 use truck_meshalgo::prelude::*;
 use truck_stepio::r#in::{Axis2Placement3dHolder, Axis2PlacementHolder, BSplineCurveWithKnots, CartesianPoint, CartesianPointHolder, CurveAnyHolder, DirectionHolder, FaceBoundHolder, NonRationalBSplineCurveHolder, NonRationalBSplineSurfaceHolder, Table, VectorHolder, VertexPointHolder};
-use nom::Finish;
 use utf8_read::Reader;
 
 pub const PI36_FLOAT_RANGE: [f64; 36] = {

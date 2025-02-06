@@ -24,7 +24,7 @@ use crate::device::app::App;
 use crate::device::graphics::Graphics;
 
 fn main() {
-    let mut builder = Builder::from_default_env();
+    let mut builder: Builder = Builder::from_default_env();
     builder.target(Target::Stdout);
     builder.filter(None, LevelFilter::Warn).init();
 
