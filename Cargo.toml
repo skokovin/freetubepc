@@ -12,7 +12,7 @@ edition = "2021"
 encoding_rs = "0.8.35"
 encoding_rs_io = "0.1.7"
 utf8-read = "0.4.0"
-once_cell = "1.20.2"
+once_cell = "1.20.3"
 env_logger = "0.11.6"
 #parking_lot = "0.12.3"
 itertools = "0.14.0"
@@ -46,7 +46,7 @@ pollster = "0.4.0"
 #https://stackoverflow.com/questions/77373416/the-trait-raw-window-handlehasrawdisplayhandle-is-not-implemented-for-windo
 
 #winit = { git="https://github.com/rust-windowing/winit.git"}
-winit = { version = "0.30.8" }
+winit = { version = "0.30.9" }
 is-odd = "1.1.1"
 palette = { version = "0.7.6", default-features = true, features = ["named", "named_from_str", "bytemuck"] }
 #wgpu={git = "https://github.com/gfx-rs/wgpu.git",features = ["webgpu"]}
