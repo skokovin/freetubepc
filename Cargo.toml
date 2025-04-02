@@ -12,8 +12,8 @@ edition = "2021"
 encoding_rs = "0.8.35"
 encoding_rs_io = "0.1.7"
 utf8-read = "0.4.0"
-once_cell = "1.21.0"
-env_logger = "0.11.7"
+once_cell = "1.21.3"
+env_logger = "0.11.8"
 #parking_lot = "0.12.3"
 itertools = "0.14.0"
 
@@ -37,7 +37,7 @@ truck-stepio = { git = "https://github.com/ricosjp/truck.git" }
 smaa = "0.16.0"
 #smaa = { path = "../smaa-rs" }
 #bitflags = "2.6.0"
-log = "0.4.26"
+log = "0.4.27"
 pollster = "0.4.0"
 #kurbo = "0.11.1"
 #glyphon = "0.6.0"
@@ -51,8 +51,8 @@ is-odd = "1.1.1"
 palette = { version = "0.7.6", default-features = true, features = ["named", "named_from_str", "bytemuck"] }
 #wgpu={git = "https://github.com/gfx-rs/wgpu.git",features = ["webgpu"]}
 #wgpu = { version = "22.1.0", default-features = false,features = ["webgl","wgsl"]}
-wgpu = { version = "24.0.1" }
-image = "0.25.5"
+wgpu = { version = "24.0.3" }
+image = "0.25.6"
 rand = "0.9.0"
 bytemuck = { version = "1.22.0", features = ["derive"] }
 cgmath = "0.18.0"
@@ -69,7 +69,7 @@ cgmath = "0.18.0"
 serde = { version = "1.0.219", features = ["derive"] }
 phf = "0.11.3"
 rusttype = "0.9.3"
-shipyard = "0.7.8"
+shipyard = "0.8.0"
 egui = "0.31.1"
 type-map = "0.5.0"
 ahash = "0.8.11"
@@ -79,5 +79,5 @@ egui-winit = "0.31.1"
 egui_extras = "0.31.1"
 eframe = "0.31.1"
 profiling = "1.0.16"
-rfd = "0.15.2"
-matches = "0.1.10"
+rfd = "0.15.3"
+#matches = "0.1.10"

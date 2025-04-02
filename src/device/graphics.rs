@@ -20,7 +20,7 @@ use crate::utils::materials::{Material, MATERIALS_COUNT};
 use egui::Id;
 use is_odd::IsOdd;
 use shipyard::{
-    AllStoragesViewMut, EntitiesViewMut, EntityId, System, Unique, UniqueViewMut, ViewMut, World,
+    AllStoragesViewMut, EntitiesViewMut, EntityId,  Unique, UniqueViewMut, ViewMut, World,
 };
 use smaa::{SmaaFrame, SmaaMode, SmaaTarget};
 use std::cell::RefCell;
