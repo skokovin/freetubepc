@@ -9,7 +9,7 @@ use cgmath::num_traits::signum;
 use smaa::{SmaaMode, SmaaTarget};
 //use wasm_bindgen::JsCast;
 
-use wgpu::{Adapter, Device, Instance, Queue, Surface, SurfaceConfiguration, SurfaceError, SurfaceTexture, TextureFormat};
+use wgpu::{Adapter, Device, Instance, Queue, RequestAdapterError, Surface, SurfaceConfiguration, SurfaceError, SurfaceTexture, TextureFormat};
 
 use crate::device::background_pipleine::BackGroundPipeLine;
 use crate::device::camera::{camera_zoom, update_camera_by_mouse, Camera};
@@ -191,13 +191,14 @@ fn create_graphics(event_loop: &ActiveEventLoop) -> impl Future<Output = Graphic
         };
 
         let (device, queue): (Device, Queue) = adapter.request_device(
-                &wgpu::DeviceDescriptor {
+            &wgpu::DeviceDescriptor {
                     label: None,
                     required_features: Default::default(),
                     required_limits: wgpu::Limits::downlevel_webgl2_defaults(),
                     memory_hints: Default::default(),
-                },
-                None,
+                trace: Default::default(),
+            },
+            
             )
             .await
             .unwrap();
@@ -259,17 +260,21 @@ async fn create_primary() -> Option<(Instance, Adapter)> {
     };
 
     let instance: Instance = wgpu::Instance::new(&inst_descr);
-    let adapter = instance
+    
+    
+    
+    let adapter: Result<Adapter, RequestAdapterError> = instance
         .request_adapter(&wgpu::RequestAdapterOptions {
             compatible_surface: None, // Some(&surface)
             power_preference: wgpu::PowerPreference::None,
             force_fallback_adapter: false,
-        })
-        .await;
+        }).await;
+    
     match adapter {
-        None => None,
-        Some(adapt) => Some((instance, adapt)),
+        Ok(adapt) =>  Some((instance, adapt)),
+        Err(e) => {warn!("{:?}", e);None}
     }
+
 }
 
 

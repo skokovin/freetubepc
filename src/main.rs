@@ -33,4 +33,5 @@ fn main() {
     let mut app: App = App::new(&event_loop);
 
     let _ = event_loop.run_app(&mut app);
+    
 }
