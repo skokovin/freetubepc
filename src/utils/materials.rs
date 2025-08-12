@@ -3,7 +3,7 @@ use bytemuck::{Pod, Zeroable};
 use palette::encoding::Linear;
 use palette::rgb::Rgb;
 use palette::Srgb;
-use phf::phf_map;
+use phf_macros::phf_map;
 
 pub const PIPE_TY_MIN: i32 = 20;
 pub const PIPE_TY_MAX: i32 = 40;

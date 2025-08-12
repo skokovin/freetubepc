@@ -50,12 +50,12 @@ pollster = "0.4.0"
 winit = { version = "0.30.12" }
 is-odd = "1.1.1"
 palette = { version = "0.7.6", default-features = true, features = ["named", "named_from_str", "bytemuck"] }
-#wgpu={git = "https://github.com/gfx-rs/wgpu.git",features = ["webgpu"]}
+#wgpu={git = "https://github.com/gfx-rs/wgpu.git"}
 #wgpu = { version = "22.1.0", default-features = false,features = ["webgl","wgsl"]}
 wgpu = { version = "25.0.2" }
 image = "0.25.6"
-rand = "0.9.1"
-bytemuck = { version = "1.23.1", features = ["derive"] }
+rand = "0.9.2"
+bytemuck = { version = "1.23.2", features = ["derive"] }
 cgmath = "0.18.0"
 #nalgebra = "0.33.2"
 #glob = "0.3.1"
@@ -68,7 +68,8 @@ cgmath = "0.18.0"
 #tokio = { version = "1.41.1", features = ["sync", "rt", "macros"] }
 #serde_json = "1.0.132"
 serde = { version = "1.0.219", features = ["derive"] }
-phf = "0.11.3"
+phf = "0.12.1"
+phf_macros = "0.12.1"
 rusttype = "0.9.3"
 shipyard = "0.8.1"
 egui = "0.32.0"
